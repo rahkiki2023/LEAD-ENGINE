@@ -7,7 +7,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
-    .spin { animation: spin 1s linear infinite; }
+    .spin { animation: spin 1s linear infinite; display: inline-block; }
     @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
   </style>
 </head>
@@ -18,18 +18,19 @@
     <div class="w-8 h-8 rounded-lg bg-emerald-400 flex items-center justify-center text-slate-900 font-bold text-sm">LE</div>
     <div>
       <div class="font-bold text-lg leading-tight">Lead Engine v2</div>
-      <div class="text-xs text-slate-400">Connected to Google Sheets</div>
+      <div class="text-xs text-slate-400">Connected to Google Sheets · AI Powered</div>
     </div>
     <button onclick="refreshAll()" class="ml-auto bg-slate-700 hover:bg-slate-600 text-white text-xs px-3 py-1.5 rounded-lg">↻ Refresh</button>
   </div>
 
   <!-- NAV -->
   <div class="bg-white border-b px-4 flex gap-1 overflow-x-auto">
-    <button onclick="showTab('dashboard')" id="tab-dashboard" class="tab-btn active px-4 py-3 text-sm font-medium border-b-2 border-emerald-500 text-emerald-700 whitespace-nowrap">Dashboard</button>
+    <button onclick="showTab('dashboard')" id="tab-dashboard" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-emerald-500 text-emerald-700 whitespace-nowrap">Dashboard</button>
     <button onclick="showTab('calllist')" id="tab-calllist" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-800 whitespace-nowrap">Daily Call List</button>
     <button onclick="showTab('mls')" id="tab-mls" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-800 whitespace-nowrap">Raw MLS</button>
     <button onclick="showTab('inbound')" id="tab-inbound" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-800 whitespace-nowrap">Inbound Leads</button>
     <button onclick="showTab('pipeline')" id="tab-pipeline" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-800 whitespace-nowrap">Pipeline</button>
+    <button onclick="showTab('ai')" id="tab-ai" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-800 whitespace-nowrap">🤖 AI Tools</button>
   </div>
 
   <!-- MAIN -->
@@ -37,7 +38,7 @@
 
     <!-- DASHBOARD -->
     <div id="view-dashboard">
-      <div id="stats" class="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-6">
+      <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-6">
         <div class="bg-slate-100 rounded-xl p-4"><div class="text-2xl font-bold" id="stat-total">—</div><div class="text-sm font-semibold text-gray-600">Total Leads</div></div>
         <div class="bg-blue-50 rounded-xl p-4"><div class="text-2xl font-bold" id="stat-calls">—</div><div class="text-sm font-semibold text-gray-600">Call Today</div></div>
         <div class="bg-green-50 rounded-xl p-4"><div class="text-2xl font-bold" id="stat-appts">—</div><div class="text-sm font-semibold text-gray-600">Appointments</div></div>
@@ -108,10 +109,96 @@
       <div id="pipeline-board" class="grid grid-cols-2 gap-3 sm:grid-cols-3"></div>
     </div>
 
+    <!-- AI TOOLS -->
+    <div id="view-ai" class="hidden space-y-6">
+
+      <!-- LEAD SCORER -->
+      <div class="bg-white rounded-xl border p-5">
+        <div class="font-bold text-gray-800 text-lg mb-1">🎯 Lead Scorer</div>
+        <div class="text-xs text-gray-400 mb-4">Paste a lead's details and AI ranks motivation 1–10 with a reason and recommended opener.</div>
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <label class="text-xs font-semibold text-gray-600">Address</label>
+            <input id="score-address" class="w-full border rounded-lg px-3 py-2 text-sm mt-1" placeholder="123 Maple St, Springfield" />
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-gray-600">Original Price</label>
+            <input id="score-orig" class="w-full border rounded-lg px-3 py-2 text-sm mt-1" placeholder="$450,000" />
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-gray-600">Current List Price</label>
+            <input id="score-list" class="w-full border rounded-lg px-3 py-2 text-sm mt-1" placeholder="$429,000" />
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-gray-600">Days on Market (DOM)</label>
+            <input id="score-dom" class="w-full border rounded-lg px-3 py-2 text-sm mt-1" placeholder="42" />
+          </div>
+          <div class="sm:col-span-2">
+            <label class="text-xs font-semibold text-gray-600">Marketing Remarks</label>
+            <textarea id="score-remarks" class="w-full border rounded-lg px-3 py-2 text-sm mt-1" rows="2" placeholder="Motivated seller, price reduced, must sell..."></textarea>
+          </div>
+        </div>
+        <button onclick="scoreLead()" class="mt-4 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-lg text-sm font-semibold">Score This Lead</button>
+        <div id="score-result" class="mt-4 hidden"></div>
+      </div>
+
+      <!-- CALL COACH -->
+      <div class="bg-white rounded-xl border p-5">
+        <div class="font-bold text-gray-800 text-lg mb-1">📞 Call Coach</div>
+        <div class="text-xs text-gray-400 mb-4">Paste your notes from a call. AI tells you what happened, what objection you hit, and exactly what to say next.</div>
+        <div class="space-y-3">
+          <div>
+            <label class="text-xs font-semibold text-gray-600">Lead Name / Address</label>
+            <input id="coach-name" class="w-full border rounded-lg px-3 py-2 text-sm mt-1" placeholder="John Smith / 123 Maple St" />
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-gray-600">Your Call Notes</label>
+            <textarea id="coach-notes" class="w-full border rounded-lg px-3 py-2 text-sm mt-1" rows="4" placeholder="Called John, he answered. Said he's not ready to sell yet, wants to wait until spring. Seemed open but hesitant. Wife wasn't home..."></textarea>
+          </div>
+        </div>
+        <button onclick="coachCall()" class="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-semibold">Get Coaching</button>
+        <div id="coach-result" class="mt-4 hidden"></div>
+      </div>
+
+      <!-- FOLLOW-UP WRITER -->
+      <div class="bg-white rounded-xl border p-5">
+        <div class="font-bold text-gray-800 text-lg mb-1">✉️ Follow-Up Writer</div>
+        <div class="text-xs text-gray-400 mb-4">Tell AI about the lead and last conversation. Get a ready-to-send SMS or email in seconds.</div>
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <label class="text-xs font-semibold text-gray-600">Lead Name</label>
+            <input id="fw-name" class="w-full border rounded-lg px-3 py-2 text-sm mt-1" placeholder="John Smith" />
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-gray-600">Property</label>
+            <input id="fw-property" class="w-full border rounded-lg px-3 py-2 text-sm mt-1" placeholder="123 Maple St" />
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-gray-600">Message Type</label>
+            <select id="fw-type" class="w-full border rounded-lg px-3 py-2 text-sm mt-1 bg-white">
+              <option>SMS (short, casual)</option>
+              <option>Email (professional)</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-gray-600">Your Name</label>
+            <input id="fw-agent" class="w-full border rounded-lg px-3 py-2 text-sm mt-1" placeholder="Your name" />
+          </div>
+          <div class="sm:col-span-2">
+            <label class="text-xs font-semibold text-gray-600">Context (last conversation / situation)</label>
+            <textarea id="fw-context" class="w-full border rounded-lg px-3 py-2 text-sm mt-1" rows="3" placeholder="Spoke last week, wants to wait until spring, concerned about market timing, has lived there 12 years..."></textarea>
+          </div>
+        </div>
+        <button onclick="writeFollowUp()" class="mt-4 bg-purple-600 hover:bg-purple-700 text-white px-5 py-2 rounded-lg text-sm font-semibold">Write Message</button>
+        <div id="fw-result" class="mt-4 hidden"></div>
+      </div>
+
+    </div>
   </div>
 
   <script>
-    const API = 'https://script.google.com/macros/s/AKfycbz_PaC9QBcynvG-DPAcCGAUDPGyetJjC06NfZhgkrxohWIGcB8yIACWETbWB-WJyHf0Fg/exec';
+    const SHEET_API = 'https://script.google.com/macros/s/AKfycbz_PaC9QBcynvG-DPAcCGAUDPGyetJjC06NfZhgkrxohWIGcB8yIACWETbWB-WJyHf0Fg/exec';
+    const AI_API   = 'https://api.anthropic.com/v1/messages';
 
     const STATUS_COLORS = {
       'New':         'bg-blue-100 text-blue-800',
@@ -123,25 +210,152 @@
       'Dead':        'bg-gray-100 text-gray-400',
     };
 
-    const PRIORITY = ['Appointment','Follow Up','Contacted','Attempted','New'];
-    const SKIP     = ['Dead','Listing'];
-    const STAGES   = ['New','Attempted','Contacted','Follow Up','Appointment','Listing'];
-
+    const STAGES = ['New','Attempted','Contacted','Follow Up','Appointment','Listing'];
     let mlsData = [], inboundData = [], callData = [];
 
     function badge(status) {
       const cls = STATUS_COLORS[status] || 'bg-gray-100 text-gray-600';
-      return `<span class="text-xs font-semibold px-2 py-0.5 rounded-full ${cls}">${status || 'New'}</span>`;
+      return `<span class="text-xs font-semibold px-2 py-0.5 rounded-full ${cls}">${status||'New'}</span>`;
+    }
+
+    function resultBox(content, color='emerald') {
+      return `<div class="bg-${color}-50 border border-${color}-200 rounded-xl p-4 text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">${content}</div>`;
+    }
+
+    function loadingBox(msg) {
+      return `<div class="bg-gray-50 border rounded-xl p-4 text-sm text-gray-400"><span class="spin">⏳</span> ${msg}</div>`;
+    }
+
+    async function callAI(prompt) {
+      const res = await fetch(AI_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 1000,
+          messages: [{ role: 'user', content: prompt }]
+        })
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error.message);
+      return data.content[0].text;
+    }
+
+    async function scoreLead() {
+      const addr    = document.getElementById('score-address').value;
+      const orig    = document.getElementById('score-orig').value;
+      const list    = document.getElementById('score-list').value;
+      const dom     = document.getElementById('score-dom').value;
+      const remarks = document.getElementById('score-remarks').value;
+      const el      = document.getElementById('score-result');
+
+      if (!addr && !dom) { alert('Please fill in at least the address and DOM.'); return; }
+
+      el.classList.remove('hidden');
+      el.innerHTML = loadingBox('Scoring this lead...');
+
+      try {
+        const prompt = `You are an expert real estate coach helping an agent prioritize leads.
+
+Analyze this MLS lead and score seller motivation:
+
+Address: ${addr}
+Original Price: ${orig}
+Current List Price: ${list}
+Days on Market: ${dom}
+Marketing Remarks: ${remarks}
+
+Respond in this exact format:
+SCORE: [1-10]
+MOTIVATION: [1-2 sentence explanation of why this score]
+RED FLAGS: [any concerns, or "None"]
+OPENER: [One specific opening line the agent should use when calling this seller]`;
+
+        const result = await callAI(prompt);
+        el.innerHTML = resultBox(result, 'emerald');
+      } catch(e) {
+        el.innerHTML = resultBox(`Error: ${e.message}`, 'red');
+      }
+    }
+
+    async function coachCall() {
+      const name  = document.getElementById('coach-name').value;
+      const notes = document.getElementById('coach-notes').value;
+      const el    = document.getElementById('coach-result');
+
+      if (!notes) { alert('Please paste your call notes.'); return; }
+
+      el.classList.remove('hidden');
+      el.innerHTML = loadingBox('Analyzing your call...');
+
+      try {
+        const prompt = `You are an expert real estate sales coach reviewing a call an agent just made.
+
+Lead: ${name}
+Call Notes: ${notes}
+
+Analyze this call and respond in this exact format:
+WHAT WENT WELL: [1-2 things the agent did right]
+OBJECTION IDENTIFIED: [The core objection or hesitation from the seller]
+ROOT CAUSE: [What's really behind that objection]
+FOLLOW-UP SCRIPT: [Word-for-word what the agent should say on the next call or voicemail]
+TIMING: [When should the agent follow up and why]`;
+
+        const result = await callAI(prompt);
+        el.innerHTML = resultBox(result, 'blue');
+      } catch(e) {
+        el.innerHTML = resultBox(`Error: ${e.message}`, 'red');
+      }
+    }
+
+    async function writeFollowUp() {
+      const name     = document.getElementById('fw-name').value;
+      const property = document.getElementById('fw-property').value;
+      const type     = document.getElementById('fw-type').value;
+      const agent    = document.getElementById('fw-agent').value;
+      const context  = document.getElementById('fw-context').value;
+      const el       = document.getElementById('fw-result');
+
+      if (!name || !context) { alert('Please fill in the lead name and context.'); return; }
+
+      el.classList.remove('hidden');
+      el.innerHTML = loadingBox('Writing your message...');
+
+      try {
+        const isSMS = type.includes('SMS');
+        const prompt = `You are an expert real estate copywriter writing follow-up messages for a real estate agent.
+
+Lead Name: ${name}
+Property: ${property}
+Agent Name: ${agent}
+Message Type: ${type}
+Context / Last Conversation: ${context}
+
+Write a ${isSMS ? 'short, natural, conversational SMS (under 160 characters if possible, never salesy)' : 'professional but warm email with a subject line (concise, not pushy)'} follow-up message.
+
+${isSMS ? 'SMS only — no subject line. Sound like a real person texting, not a corporation.' : 'Include: Subject line, greeting, 2-3 sentence body, soft call to action, sign-off.'}
+
+Do not use generic real estate clichés. Make it feel personal and specific to their situation.`;
+
+        const result = await callAI(prompt);
+        el.innerHTML = resultBox(result, 'purple') +
+          `<button onclick="copyResult('fw-result')" class="mt-2 text-xs bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg">Copy Message</button>`;
+      } catch(e) {
+        el.innerHTML = resultBox(`Error: ${e.message}`, 'red');
+      }
+    }
+
+    function copyResult(id) {
+      const text = document.getElementById(id).querySelector('div').innerText;
+      navigator.clipboard.writeText(text);
+      alert('Copied to clipboard!');
     }
 
     async function fetchTab(tab) {
       try {
-        const res = await fetch(`${API}?tab=${tab}`);
+        const res = await fetch(`${SHEET_API}?tab=${tab}`);
         return await res.json();
-      } catch(e) {
-        console.error('Fetch error:', tab, e);
-        return [];
-      }
+      } catch(e) { return []; }
     }
 
     async function refreshAll() {
@@ -160,26 +374,22 @@
 
     function renderDashboard() {
       const all   = [...mlsData, ...inboundData];
-      const calls = callData.length;
-      const appts = all.filter(l => (l['Status']||l['status']) === 'Appointment').length;
-      const lists = all.filter(l => (l['Status']||l['status']) === 'Listing').length;
-
       document.getElementById('stat-total').textContent    = all.length;
-      document.getElementById('stat-calls').textContent    = calls;
-      document.getElementById('stat-appts').textContent    = appts;
-      document.getElementById('stat-listings').textContent = lists;
+      document.getElementById('stat-calls').textContent    = callData.length;
+      document.getElementById('stat-appts').textContent    = all.filter(l => l['Status'] === 'Appointment').length;
+      document.getElementById('stat-listings').textContent = all.filter(l => l['Status'] === 'Listing').length;
 
-      const top5 = callData.slice(0, 5);
-      const el   = document.getElementById('priority-list');
-      if (!top5.length) {
+      const el = document.getElementById('priority-list');
+      const top = callData.slice(0, 5);
+      if (!top.length) {
         el.innerHTML = '<div class="p-6 text-center text-gray-400 text-sm">No active leads yet — paste your MLS export into the Sheet to get started.</div>';
         return;
       }
-      el.innerHTML = top5.map(l => `
+      el.innerHTML = top.map(l => `
         <div class="flex items-center justify-between px-4 py-3 gap-2">
           <div>
-            <div class="font-medium text-sm">${l['Name / Address'] || l['Name/Address'] || '—'}</div>
-            <div class="text-xs text-gray-400">${l['Origin'] || ''} · ${l['City / Source'] || l['City/Source'] || ''}</div>
+            <div class="font-medium text-sm">${l['Name / Address']||l['Name/Address']||'—'}</div>
+            <div class="text-xs text-gray-400">${l['Origin']||''} · ${l['City / Source']||l['City/Source']||''}</div>
           </div>
           ${badge(l['Status'])}
         </div>`).join('');
@@ -188,14 +398,14 @@
     function renderCallList() {
       const el = document.getElementById('calllist-body');
       if (!callData.length) {
-        el.innerHTML = '<div class="bg-white rounded-xl border p-6 text-center text-gray-400 text-sm">No calls today — check your Sheet.</div>';
+        el.innerHTML = '<div class="bg-white rounded-xl border p-6 text-center text-gray-400 text-sm">No calls today.</div>';
         return;
       }
       el.innerHTML = callData.map((l, i) => `
         <div class="bg-white rounded-xl border px-4 py-3 flex items-center gap-4">
           <div class="text-lg font-bold text-gray-300 w-6">${i+1}</div>
           <div class="flex-1 min-w-0">
-            <div class="font-semibold text-gray-800">${l['Name / Address'] || l['Name/Address'] || '—'}</div>
+            <div class="font-semibold text-gray-800">${l['Name / Address']||l['Name/Address']||'—'}</div>
             <div class="text-xs text-gray-400">${l['Origin']||''} · ${l['City / Source']||l['City/Source']||''} ${l['Phone'] ? '· '+l['Phone'] : ''}</div>
             ${l['Notes'] ? `<div class="text-xs text-gray-500 mt-0.5 italic">${l['Notes']}</div>` : ''}
           </div>
@@ -209,17 +419,17 @@
     function renderMLS() {
       const el = document.getElementById('mls-body');
       if (!mlsData.length) {
-        el.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center text-gray-400 text-sm">No MLS data yet — paste your export into the RAW_MLS tab.</td></tr>';
+        el.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center text-gray-400 text-sm">No MLS data yet.</td></tr>';
         return;
       }
       el.innerHTML = mlsData.map(l => {
         const dom = parseInt(l['DOM']) || 0;
-        const domColor = dom > 60 ? 'text-red-600 font-bold' : dom > 30 ? 'text-orange-500 font-bold' : 'text-gray-700';
+        const dc  = dom > 60 ? 'text-red-600 font-bold' : dom > 30 ? 'text-orange-500 font-bold' : 'text-gray-700';
         return `<tr class="hover:bg-gray-50">
           <td class="px-3 py-2 font-medium">${l['Street Number']||''} ${l['Street Name']||''}</td>
           <td class="px-3 py-2 text-gray-500">${l['Municipality']||''}</td>
           <td class="px-3 py-2 text-emerald-700 font-semibold">${l['Listing Price']||''}</td>
-          <td class="px-3 py-2 ${domColor}">${dom}</td>
+          <td class="px-3 py-2 ${dc}">${dom}</td>
           <td class="px-3 py-2">${badge(l['Status'])}</td>
           <td class="px-3 py-2 text-gray-400 text-xs max-w-xs truncate">${l['Notes']||''}</td>
         </tr>`;
@@ -245,8 +455,7 @@
 
     function renderPipeline() {
       const all = [...mlsData, ...inboundData];
-      const el  = document.getElementById('pipeline-board');
-      el.innerHTML = STAGES.map(stage => {
+      document.getElementById('pipeline-board').innerHTML = STAGES.map(stage => {
         const leads = all.filter(l => (l['Status']||'New') === stage);
         return `
           <div class="bg-white rounded-xl border p-3">
@@ -257,7 +466,7 @@
             <div class="space-y-1">
               ${leads.length ? leads.map(l => `
                 <div class="text-xs bg-gray-50 rounded px-2 py-1.5 border">
-                  <div class="font-medium">${l['Name']||l['Street Number']+' '+l['Street Name']||'—'}</div>
+                  <div class="font-medium">${l['Name']||((l['Street Number']||'')+' '+(l['Street Name']||''))||'—'}</div>
                   <div class="text-gray-400">${l['Municipality']||l['Source']||''}</div>
                 </div>`).join('') : '<div class="text-xs text-gray-300 text-center py-2">Empty</div>'}
             </div>
@@ -266,19 +475,18 @@
     }
 
     function showTab(name) {
-      ['dashboard','calllist','mls','inbound','pipeline'].forEach(t => {
+      ['dashboard','calllist','mls','inbound','pipeline','ai'].forEach(t => {
         document.getElementById(`view-${t}`).classList.add('hidden');
         const btn = document.getElementById(`tab-${t}`);
         btn.classList.remove('border-emerald-500','text-emerald-700');
         btn.classList.add('border-transparent','text-gray-500');
       });
       document.getElementById(`view-${name}`).classList.remove('hidden');
-      const active = document.getElementById(`tab-${name}`);
-      active.classList.add('border-emerald-500','text-emerald-700');
-      active.classList.remove('border-transparent','text-gray-500');
+      const a = document.getElementById(`tab-${name}`);
+      a.classList.add('border-emerald-500','text-emerald-700');
+      a.classList.remove('border-transparent','text-gray-500');
     }
 
-    // Load on start
     refreshAll();
   </script>
 </body>
