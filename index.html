@@ -198,7 +198,7 @@
 
   <script>
     const SHEET_API = 'https://script.google.com/macros/s/AKfycbz_PaC9QBcynvG-DPAcCGAUDPGyetJjC06NfZhgkrxohWIGcB8yIACWETbWB-WJyHf0Fg/exec';
-    const AI_API   = 'https://api.anthropic.com/v1/messages';
+    const AI_API   = '/api/ai';
 
     const STATUS_COLORS = {
       'New':         'bg-blue-100 text-blue-800',
@@ -230,15 +230,11 @@
       const res = await fetch(AI_API, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 1000,
-          messages: [{ role: 'user', content: prompt }]
-        })
+        body: JSON.stringify({ prompt })
       });
       const data = await res.json();
-      if (data.error) throw new Error(data.error.message);
-      return data.content[0].text;
+      if (data.error) throw new Error(data.error);
+      return data.result;
     }
 
     async function scoreLead() {
