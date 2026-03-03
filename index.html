@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lead Engine v2</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    .spin { animation: spin 1s linear infinite; }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+  <!-- HEADER -->
+  <div class="bg-gradient-to-r from-slate-900 to-slate-700 text-white px-6 py-4 flex items-center gap-3">
+    <div class="w-8 h-8 rounded-lg bg-emerald-400 flex items-center justify-center text-slate-900 font-bold text-sm">LE</div>
+    <div>
+      <div class="font-bold text-lg leading-tight">Lead Engine v2</div>
+      <div class="text-xs text-slate-400">Connected to Google Sheets</div>
+    </div>
+    <button onclick="refreshAll()" class="ml-auto bg-slate-700 hover:bg-slate-600 text-white text-xs px-3 py-1.5 rounded-lg">↻ Refresh</button>
+  </div>
+
+  <!-- NAV -->
+  <div class="bg-white border-b px-4 flex gap-1 overflow-x-auto">
+    <button onclick="showTab('dashboard')" id="tab-dashboard" class="tab-btn active px-4 py-3 text-sm font-medium border-b-2 border-emerald-500 text-emerald-700 whitespace-nowrap">Dashboard</button>
+    <button onclick="showTab('calllist')" id="tab-calllist" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-800 whitespace-nowrap">Daily Call List</button>
+    <button onclick="showTab('mls')" id="tab-mls" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-800 whitespace-nowrap">Raw MLS</button>
+    <button onclick="showTab('inbound')" id="tab-inbound" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-800 whitespace-nowrap">Inbound Leads</button>
+    <button onclick="showTab('pipeline')" id="tab-pipeline" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-800 whitespace-nowrap">Pipeline</button>
+  </div>
+
+  <!-- MAIN -->
+  <div class="p-4 max-w-6xl mx-auto">
+
+    <!-- DASHBOARD -->
+    <div id="view-dashboard">
+      <div id="stats" class="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-6">
+        <div class="bg-slate-100 rounded-xl p-4"><div class="text-2xl font-bold" id="stat-total">—</div><div class="text-sm font-semibold text-gray-600">Total Leads</div></div>
+        <div class="bg-blue-50 rounded-xl p-4"><div class="text-2xl font-bold" id="stat-calls">—</div><div class="text-sm font-semibold text-gray-600">Call Today</div></div>
+        <div class="bg-green-50 rounded-xl p-4"><div class="text-2xl font-bold" id="stat-appts">—</div><div class="text-sm font-semibold text-gray-600">Appointments</div></div>
+        <div class="bg-emerald-50 rounded-xl p-4"><div class="text-2xl font-bold" id="stat-listings">—</div><div class="text-sm font-semibold text-gray-600">Listings</div></div>
+      </div>
+      <div class="font-semibold text-gray-700 mb-2">Top Priority Calls</div>
+      <div id="priority-list" class="bg-white rounded-xl border divide-y"></div>
+    </div>
+
+    <!-- CALL LIST -->
+    <div id="view-calllist" class="hidden">
+      <div class="mb-3">
+        <div class="font-bold text-gray-800">Daily Call List</div>
+        <div class="text-xs text-gray-400">Sorted by priority · Live from your Google Sheet</div>
+      </div>
+      <div id="calllist-body" class="space-y-2"></div>
+    </div>
+
+    <!-- MLS -->
+    <div id="view-mls" class="hidden">
+      <div class="mb-3">
+        <div class="font-bold text-gray-800">Raw MLS Leads</div>
+        <div class="text-xs text-gray-400">Read from your Google Sheet · Edit statuses directly in the Sheet</div>
+      </div>
+      <div class="overflow-x-auto rounded-xl border bg-white">
+        <table class="w-full text-sm">
+          <thead class="bg-slate-50 text-xs text-gray-500 uppercase">
+            <tr>
+              <th class="px-3 py-2 text-left">Address</th>
+              <th class="px-3 py-2 text-left">City</th>
+              <th class="px-3 py-2 text-left">List Price</th>
+              <th class="px-3 py-2 text-left">DOM</th>
+              <th class="px-3 py-2 text-left">Status</th>
+              <th class="px-3 py-2 text-left">Notes</th>
+            </tr>
+          </thead>
+          <tbody id="mls-body" class="divide-y"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- INBOUND -->
+    <div id="view-inbound" class="hidden">
+      <div class="mb-3">
+        <div class="font-bold text-gray-800">Inbound Leads</div>
+        <div class="text-xs text-gray-400">Read from your Google Sheet</div>
+      </div>
+      <div class="overflow-x-auto rounded-xl border bg-white">
+        <table class="w-full text-sm">
+          <thead class="bg-slate-50 text-xs text-gray-500 uppercase">
+            <tr>
+              <th class="px-3 py-2 text-left">Name</th>
+              <th class="px-3 py-2 text-left">Phone</th>
+              <th class="px-3 py-2 text-left">Source</th>
+              <th class="px-3 py-2 text-left">Property</th>
+              <th class="px-3 py-2 text-left">Status</th>
+              <th class="px-3 py-2 text-left">Notes</th>
+            </tr>
+          </thead>
+          <tbody id="inbound-body" class="divide-y"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PIPELINE -->
+    <div id="view-pipeline" class="hidden">
+      <div class="font-bold text-gray-800 mb-3">Pipeline Board</div>
+      <div id="pipeline-board" class="grid grid-cols-2 gap-3 sm:grid-cols-3"></div>
+    </div>
+
+  </div>
+
+  <script>
+    const API = 'https://script.google.com/macros/s/AKfycbz_PaC9QBcynvG-DPAcCGAUDPGyetJjC06NfZhgkrxohWIGcB8yIACWETbWB-WJyHf0Fg/exec';
+
+    const STATUS_COLORS = {
+      'New':         'bg-blue-100 text-blue-800',
+      'Attempted':   'bg-yellow-100 text-yellow-800',
+      'Contacted':   'bg-purple-100 text-purple-800',
+      'Follow Up':   'bg-orange-100 text-orange-800',
+      'Appointment': 'bg-green-100 text-green-800',
+      'Listing':     'bg-emerald-100 text-emerald-800',
+      'Dead':        'bg-gray-100 text-gray-400',
+    };
+
+    const PRIORITY = ['Appointment','Follow Up','Contacted','Attempted','New'];
+    const SKIP     = ['Dead','Listing'];
+    const STAGES   = ['New','Attempted','Contacted','Follow Up','Appointment','Listing'];
+
+    let mlsData = [], inboundData = [], callData = [];
+
+    function badge(status) {
+      const cls = STATUS_COLORS[status] || 'bg-gray-100 text-gray-600';
+      return `<span class="text-xs font-semibold px-2 py-0.5 rounded-full ${cls}">${status || 'New'}</span>`;
+    }
+
+    async function fetchTab(tab) {
+      try {
+        const res = await fetch(`${API}?tab=${tab}`);
+        return await res.json();
+      } catch(e) {
+        console.error('Fetch error:', tab, e);
+        return [];
+      }
+    }
+
+    async function refreshAll() {
+      document.getElementById('priority-list').innerHTML = '<div class="p-6 text-center text-gray-400 text-sm">Loading...</div>';
+      [mlsData, inboundData, callData] = await Promise.all([
+        fetchTab('RAW_MLS'),
+        fetchTab('INBOUND_LEADS'),
+        fetchTab('DAILY_CALL_LIST'),
+      ]);
+      renderDashboard();
+      renderCallList();
+      renderMLS();
+      renderInbound();
+      renderPipeline();
+    }
+
+    function renderDashboard() {
+      const all   = [...mlsData, ...inboundData];
+      const calls = callData.length;
+      const appts = all.filter(l => (l['Status']||l['status']) === 'Appointment').length;
+      const lists = all.filter(l => (l['Status']||l['status']) === 'Listing').length;
+
+      document.getElementById('stat-total').textContent    = all.length;
+      document.getElementById('stat-calls').textContent    = calls;
+      document.getElementById('stat-appts').textContent    = appts;
+      document.getElementById('stat-listings').textContent = lists;
+
+      const top5 = callData.slice(0, 5);
+      const el   = document.getElementById('priority-list');
+      if (!top5.length) {
+        el.innerHTML = '<div class="p-6 text-center text-gray-400 text-sm">No active leads yet — paste your MLS export into the Sheet to get started.</div>';
+        return;
+      }
+      el.innerHTML = top5.map(l => `
+        <div class="flex items-center justify-between px-4 py-3 gap-2">
+          <div>
+            <div class="font-medium text-sm">${l['Name / Address'] || l['Name/Address'] || '—'}</div>
+            <div class="text-xs text-gray-400">${l['Origin'] || ''} · ${l['City / Source'] || l['City/Source'] || ''}</div>
+          </div>
+          ${badge(l['Status'])}
+        </div>`).join('');
+    }
+
+    function renderCallList() {
+      const el = document.getElementById('calllist-body');
+      if (!callData.length) {
+        el.innerHTML = '<div class="bg-white rounded-xl border p-6 text-center text-gray-400 text-sm">No calls today — check your Sheet.</div>';
+        return;
+      }
+      el.innerHTML = callData.map((l, i) => `
+        <div class="bg-white rounded-xl border px-4 py-3 flex items-center gap-4">
+          <div class="text-lg font-bold text-gray-300 w-6">${i+1}</div>
+          <div class="flex-1 min-w-0">
+            <div class="font-semibold text-gray-800">${l['Name / Address'] || l['Name/Address'] || '—'}</div>
+            <div class="text-xs text-gray-400">${l['Origin']||''} · ${l['City / Source']||l['City/Source']||''} ${l['Phone'] ? '· '+l['Phone'] : ''}</div>
+            ${l['Notes'] ? `<div class="text-xs text-gray-500 mt-0.5 italic">${l['Notes']}</div>` : ''}
+          </div>
+          <div class="flex flex-col items-end gap-1">
+            ${badge(l['Status'])}
+            ${l['Details'] ? `<div class="text-xs text-gray-400">${l['Details']}</div>` : ''}
+          </div>
+        </div>`).join('');
+    }
+
+    function renderMLS() {
+      const el = document.getElementById('mls-body');
+      if (!mlsData.length) {
+        el.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center text-gray-400 text-sm">No MLS data yet — paste your export into the RAW_MLS tab.</td></tr>';
+        return;
+      }
+      el.innerHTML = mlsData.map(l => {
+        const dom = parseInt(l['DOM']) || 0;
+        const domColor = dom > 60 ? 'text-red-600 font-bold' : dom > 30 ? 'text-orange-500 font-bold' : 'text-gray-700';
+        return `<tr class="hover:bg-gray-50">
+          <td class="px-3 py-2 font-medium">${l['Street Number']||''} ${l['Street Name']||''}</td>
+          <td class="px-3 py-2 text-gray-500">${l['Municipality']||''}</td>
+          <td class="px-3 py-2 text-emerald-700 font-semibold">${l['Listing Price']||''}</td>
+          <td class="px-3 py-2 ${domColor}">${dom}</td>
+          <td class="px-3 py-2">${badge(l['Status'])}</td>
+          <td class="px-3 py-2 text-gray-400 text-xs max-w-xs truncate">${l['Notes']||''}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    function renderInbound() {
+      const el = document.getElementById('inbound-body');
+      if (!inboundData.length) {
+        el.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center text-gray-400 text-sm">No inbound leads yet.</td></tr>';
+        return;
+      }
+      el.innerHTML = inboundData.map(l => `
+        <tr class="hover:bg-gray-50">
+          <td class="px-3 py-2 font-medium">${l['Name']||''}</td>
+          <td class="px-3 py-2 text-blue-600">${l['Phone']||''}</td>
+          <td class="px-3 py-2 text-gray-500">${l['Source']||''}</td>
+          <td class="px-3 py-2 text-gray-600 max-w-xs truncate">${l['Property']||''}</td>
+          <td class="px-3 py-2">${badge(l['Status'])}</td>
+          <td class="px-3 py-2 text-gray-400 text-xs">${l['Notes']||''}</td>
+        </tr>`).join('');
+    }
+
+    function renderPipeline() {
+      const all = [...mlsData, ...inboundData];
+      const el  = document.getElementById('pipeline-board');
+      el.innerHTML = STAGES.map(stage => {
+        const leads = all.filter(l => (l['Status']||'New') === stage);
+        return `
+          <div class="bg-white rounded-xl border p-3">
+            <div class="flex items-center justify-between mb-2">
+              ${badge(stage)}
+              <span class="text-xs font-bold text-gray-500">${leads.length}</span>
+            </div>
+            <div class="space-y-1">
+              ${leads.length ? leads.map(l => `
+                <div class="text-xs bg-gray-50 rounded px-2 py-1.5 border">
+                  <div class="font-medium">${l['Name']||l['Street Number']+' '+l['Street Name']||'—'}</div>
+                  <div class="text-gray-400">${l['Municipality']||l['Source']||''}</div>
+                </div>`).join('') : '<div class="text-xs text-gray-300 text-center py-2">Empty</div>'}
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    function showTab(name) {
+      ['dashboard','calllist','mls','inbound','pipeline'].forEach(t => {
+        document.getElementById(`view-${t}`).classList.add('hidden');
+        const btn = document.getElementById(`tab-${t}`);
+        btn.classList.remove('border-emerald-500','text-emerald-700');
+        btn.classList.add('border-transparent','text-gray-500');
+      });
+      document.getElementById(`view-${name}`).classList.remove('hidden');
+      const active = document.getElementById(`tab-${name}`);
+      active.classList.add('border-emerald-500','text-emerald-700');
+      active.classList.remove('border-transparent','text-gray-500');
+    }
+
+    // Load on start
+    refreshAll();
+  </script>
+</body>
+</html>
