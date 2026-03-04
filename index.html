@@ -1,787 +1,344 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Lead Engine v2</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
-    .spin { animation: spin 1s linear infinite; display: inline-block; }
-    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-  </style>
-</head>
-<body class="bg-gray-50 min-h-screen">
+// ============================================================
+// LEAD ENGINE v2 — COMPLETE APPS SCRIPT
+// Paste this entire file into Extensions → Apps Script
+// Then set triggers (instructions at the bottom)
+// ============================================================
 
-  <!-- HEADER -->
-  <div class="bg-gradient-to-r from-slate-900 to-slate-700 text-white px-6 py-4 flex items-center gap-3">
-    <div class="w-8 h-8 rounded-lg bg-emerald-400 flex items-center justify-center text-slate-900 font-bold text-sm">LE</div>
-    <div>
-      <div class="font-bold text-lg leading-tight">Lead Engine v2</div>
-      <div class="text-xs text-slate-400">NYC → Easton Relocation Specialist</div>
-    </div>
-    <button onclick="refreshAll()" class="ml-auto bg-slate-700 hover:bg-slate-600 text-white text-xs px-3 py-1.5 rounded-lg">↻ Refresh</button>
-  </div>
+// ---- CONFIGURATION (reads from SETTINGS tab) ----
+function getSettings() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const s = ss.getSheetByName('SETTINGS').getDataRange().getValues();
+  return {
+    email: s[0][1],
+    name:  s[1][1],
+    phone: s[2][1],
+  };
+}
 
-  <!-- NAV -->
-  <div class="bg-white border-b px-4 flex gap-1 overflow-x-auto">
-    <button onclick="showTab('dashboard')" id="tab-dashboard" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-emerald-500 text-emerald-700 whitespace-nowrap">Dashboard</button>
-    <button onclick="showTab('plan')" id="tab-plan" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-800 whitespace-nowrap">📅 30-Day Plan</button>
-    <button onclick="showTab('weekly')" id="tab-weekly" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-800 whitespace-nowrap">🎯 Weekly Targets</button>
-    <button onclick="showTab('calllist')" id="tab-calllist" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-800 whitespace-nowrap">Call List</button>
-    <button onclick="showTab('mls')" id="tab-mls" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-800 whitespace-nowrap">Raw MLS</button>
-    <button onclick="showTab('inbound')" id="tab-inbound" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-800 whitespace-nowrap">Inbound</button>
-    <button onclick="showTab('pipeline')" id="tab-pipeline" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-800 whitespace-nowrap">Pipeline</button>
-    <button onclick="showTab('scripts')" id="tab-scripts" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-800 whitespace-nowrap">📋 Scripts</button>
-    <button onclick="showTab('videos')" id="tab-videos" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-800 whitespace-nowrap">🎥 Videos</button>
-    <button onclick="showTab('ai')" id="tab-ai" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-800 whitespace-nowrap">🤖 AI Tools</button>
-  </div>
+// ============================================================
+// SCRIPT 1: BUILD DAILY CALL LIST
+// Runs every morning at 7am
+// Reads RAW_MLS + INBOUND_LEADS, sorts by priority,
+// writes fresh list to DAILY_CALL_LIST
+// ============================================================
+function buildCallList() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const mlsSheet     = ss.getSheetByName('RAW_MLS');
+  const inboundSheet = ss.getSheetByName('INBOUND_LEADS');
+  const outSheet     = ss.getSheetByName('DAILY_CALL_LIST');
 
-  <div class="p-4 max-w-6xl mx-auto">
+  const mlsData     = mlsSheet.getDataRange().getValues();
+  const inboundData = inboundSheet.getDataRange().getValues();
 
-    <!-- DASHBOARD -->
-    <div id="view-dashboard">
-      <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-4">
-        <div class="bg-slate-100 rounded-xl p-4"><div class="text-2xl font-bold" id="stat-total">—</div><div class="text-sm font-semibold text-gray-600">Total Leads</div></div>
-        <div class="bg-blue-50 rounded-xl p-4"><div class="text-2xl font-bold" id="stat-calls">—</div><div class="text-sm font-semibold text-gray-600">Call Today</div></div>
-        <div class="bg-green-50 rounded-xl p-4"><div class="text-2xl font-bold" id="stat-appts">—</div><div class="text-sm font-semibold text-gray-600">Appointments</div></div>
-        <div class="bg-emerald-50 rounded-xl p-4"><div class="text-2xl font-bold" id="stat-listings">—</div><div class="text-sm font-semibold text-gray-600">Listings</div></div>
-      </div>
-      <div class="bg-gradient-to-r from-slate-900 to-slate-700 text-white rounded-xl p-4 mb-4">
-        <div class="text-xs text-slate-400 mb-1">Your Positioning Statement</div>
-        <div class="text-sm font-medium leading-relaxed">"I help NYC families trade the chaos of the city for more space, more peace, and a home they can actually afford in Easton, PA."</div>
-      </div>
-      <div class="font-semibold text-gray-700 mb-2">Top Priority Calls</div>
-      <div id="priority-list" class="bg-white rounded-xl border divide-y"></div>
-    </div>
+  const priority = ['Appointment', 'Follow Up', 'Contacted', 'Attempted', 'New'];
+  const skip     = ['Dead', 'Listing'];
 
-    <!-- 30-DAY PLAN -->
-    <div id="view-plan" class="hidden space-y-4">
-      <div class="font-bold text-gray-800 text-lg">30-Day Lead Generation Plan</div>
-      <div id="plan-weeks" class="space-y-3"></div>
-    </div>
+  let leads = [];
 
-    <!-- WEEKLY TARGETS -->
-    <div id="view-weekly" class="hidden space-y-4">
-      <div class="flex items-center justify-between">
-        <div>
-          <div class="font-bold text-gray-800 text-lg">Weekly Targets</div>
-          <div class="text-xs text-gray-400">Track your numbers · Reset each Monday</div>
-        </div>
-        <button onclick="resetWeekly()" class="text-xs bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg text-gray-600">Reset Week</button>
-      </div>
-      <div id="weekly-targets" class="grid grid-cols-1 gap-3 sm:grid-cols-2"></div>
-      <div class="bg-white rounded-xl border p-4">
-        <div class="font-semibold text-gray-700 mb-3 text-sm">Daily Non-Negotiables</div>
-        <div id="daily-checklist" class="space-y-2"></div>
-      </div>
-    </div>
+  // MLS leads — columns: StreetNum(A), StreetName(B), Municipality(C), OrigPrice(D), ListPrice(E), DOM(F), Remarks(G), Status(H), Notes(I), LastContact(J), OwnerName(K), Phone1(L), Phone2(M), Email(N), SkipSource(O), SkipStatus(P), DNC(Q)
+  mlsData.slice(1).forEach(r => {
+    if (!r[0]) return;
+    const status      = r[7] || 'New';
+    const skipStatus  = r[15] || 'Not Started';
+    const dncStatus   = r[16] || 'Not Checked';
+    const phone1      = r[11] || '';
+    if (skip.includes(status)) return;
+    if (dncStatus === 'On DNC List') return; // never call DNC leads
 
-    <!-- CALL LIST -->
-    <div id="view-calllist" class="hidden">
-      <div class="mb-3">
-        <div class="font-bold text-gray-800">Daily Call List</div>
-        <div class="text-xs text-gray-400">Sorted by priority · Live from your Google Sheet</div>
-      </div>
-      <div id="calllist-body" class="space-y-2"></div>
-    </div>
+    leads.push({
+      name:       `${r[0]} ${r[1]}`,
+      source:     r[2],
+      details:    `List: ${r[4]} · DOM: ${r[5]}`,
+      notes:      r[8] || '',
+      status:     status,
+      origin:     'MLS',
+      phone:      phone1,
+      dom:        parseInt(r[5]) || 0,
+      ownerName:  r[10] || '',
+      skipStatus: skipStatus,
+      hasPhone:   !!phone1,
+    });
+  });
 
-    <!-- MLS -->
-    <div id="view-mls" class="hidden">
-      <div class="mb-3">
-        <div class="font-bold text-gray-800">Raw MLS Leads</div>
-        <div class="text-xs text-gray-400">Edit statuses directly in Google Sheet</div>
-      </div>
-      <div class="overflow-x-auto rounded-xl border bg-white">
-        <table class="w-full text-sm">
-          <thead class="bg-slate-50 text-xs text-gray-500 uppercase">
-            <tr>
-              <th class="px-3 py-2 text-left">Address</th>
-              <th class="px-3 py-2 text-left">City</th>
-              <th class="px-3 py-2 text-left">List Price</th>
-              <th class="px-3 py-2 text-left">DOM</th>
-              <th class="px-3 py-2 text-left">Status</th>
-              <th class="px-3 py-2 text-left">Notes</th>
-            </tr>
-          </thead>
-          <tbody id="mls-body" class="divide-y"></tbody>
-        </table>
-      </div>
-    </div>
+  // Inbound leads — columns: Date, Name, Phone, Source, Property, Status, Notes, LastContact
+  inboundData.slice(1).forEach(r => {
+    if (!r[1]) return;
+    const status = r[5] || 'New';
+    if (skip.includes(status)) return;
+    leads.push({
+      name:    r[1],
+      source:  r[3],
+      details: r[4],
+      notes:   r[6] || '',
+      status:  status,
+      origin:  'Inbound',
+      phone:   r[2] || '',
+      dom:     0,
+      hasPhone: !!r[2],
+      skipStatus: 'Complete',
+    });
+  });
 
-    <!-- INBOUND -->
-    <div id="view-inbound" class="hidden">
-      <div class="mb-3">
-        <div class="font-bold text-gray-800">Inbound Leads</div>
-        <div class="text-xs text-gray-400">Zillow, Referrals, Social, etc.</div>
-      </div>
-      <div class="overflow-x-auto rounded-xl border bg-white">
-        <table class="w-full text-sm">
-          <thead class="bg-slate-50 text-xs text-gray-500 uppercase">
-            <tr>
-              <th class="px-3 py-2 text-left">Name</th>
-              <th class="px-3 py-2 text-left">Phone</th>
-              <th class="px-3 py-2 text-left">Source</th>
-              <th class="px-3 py-2 text-left">Property</th>
-              <th class="px-3 py-2 text-left">Status</th>
-              <th class="px-3 py-2 text-left">Notes</th>
-            </tr>
-          </thead>
-          <tbody id="inbound-body" class="divide-y"></tbody>
-        </table>
-      </div>
-    </div>
+  // Absentee Owners — columns: OwnerName(A), PropAddr(B), MailAddr(C), City(D), Phone1(E), Phone2(F), Email(G), Source(H), Units(I), EstValue(J), Status(K), Notes(L), LastContact(M), DNC(N)
+  const absenteeSheet = ss.getSheetByName('ABSENTEE_OWNERS');
+  if (absenteeSheet) {
+    absenteeSheet.getDataRange().getValues().slice(1).forEach(r => {
+      if (!r[0]) return;
+      const status  = r[10] || 'New';
+      const dncStatus = r[13] || 'Not Checked';
+      const phone   = r[4] || '';
+      if (skip.includes(status)) return;
+      if (dncStatus === 'On DNC List') return;
+      leads.push({
+        name:      r[0],
+        source:    r[7] || 'Absentee Owner',
+        details:   `${r[1]} · ${r[9] ? 'Est: '+r[9] : ''} · ${r[8] ? r[8]+' units' : ''}`.trim(),
+        notes:     r[11] || '',
+        status:    status,
+        origin:    'Absentee',
+        phone:     phone,
+        dom:       0,
+        hasPhone:  !!phone,
+        skipStatus: phone ? 'Complete' : 'Not Started',
+      });
+    });
+  }
 
-    <!-- PIPELINE -->
-    <div id="view-pipeline" class="hidden">
-      <div class="font-bold text-gray-800 mb-3">Pipeline Board</div>
-      <div id="pipeline-board" class="grid grid-cols-2 gap-3 sm:grid-cols-3"></div>
-    </div>
+  // Landlords — columns: OwnerName(A), PropAddr(B), MailAddr(C), City(D), Phone1(E), Phone2(F), Email(G), Source(H), Units(I), AskingRent(J), Status(K), Notes(L), LastContact(M), DNC(N)
+  const landlordSheet = ss.getSheetByName('LANDLORDS');
+  if (landlordSheet) {
+    landlordSheet.getDataRange().getValues().slice(1).forEach(r => {
+      if (!r[0]) return;
+      const status    = r[10] || 'New';
+      const dncStatus = r[13] || 'Not Checked';
+      const phone     = r[4] || '';
+      if (skip.includes(status)) return;
+      if (dncStatus === 'On DNC List') return;
+      leads.push({
+        name:      r[0],
+        source:    r[7] || 'Landlord',
+        details:   `${r[1]} · ${r[9] ? 'Rent: '+r[9] : ''} · ${r[8] ? r[8]+' units' : ''}`.trim(),
+        notes:     r[11] || '',
+        status:    status,
+        origin:    'Landlord',
+        phone:     phone,
+        dom:       0,
+        hasPhone:  !!phone,
+        skipStatus: phone ? 'Complete' : 'Not Started',
+      });
+    });
+  }
 
-    <!-- SCRIPTS -->
-    <div id="view-scripts" class="hidden space-y-3">
-      <div>
-        <div class="font-bold text-gray-800 text-lg">NYC → Easton Scripts</div>
-        <div class="text-xs text-gray-400">Tailored for your relocation niche · Use these verbatim or adapt to your voice</div>
-      </div>
-      <div id="scripts-list" class="space-y-3"></div>
-    </div>
+  // Sort: skip trace Complete + phone first, then by priority
+  leads.sort((a, b) => {
+    const aReady = a.hasPhone && a.skipStatus === 'Complete' ? 0 : a.hasPhone ? 1 : 2;
+    const bReady = b.hasPhone && b.skipStatus === 'Complete' ? 0 : b.hasPhone ? 1 : 2;
+    if (aReady !== bReady) return aReady - bReady;
+    return priority.indexOf(a.status) - priority.indexOf(b.status);
+  });
 
-    <!-- VIDEOS -->
-    <div id="view-videos" class="hidden space-y-4">
-      <div class="flex items-center justify-between">
-        <div>
-          <div class="font-bold text-gray-800 text-lg">Video Content Tracker</div>
-          <div class="text-xs text-gray-400">Track filming, posting, and engagement</div>
-        </div>
-        <button onclick="showAddVideo()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-1.5 rounded-lg font-medium">+ Add Video</button>
-      </div>
-      <div id="add-video-form" class="hidden bg-white rounded-xl border p-4 space-y-3">
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div>
-            <label class="text-xs font-semibold text-gray-600">Video Title</label>
-            <input id="v-title" class="w-full border rounded-lg px-3 py-2 text-sm mt-1" placeholder="What $500K buys in Easton vs NYC" />
-          </div>
-          <div>
-            <label class="text-xs font-semibold text-gray-600">Week</label>
-            <select id="v-week" class="w-full border rounded-lg px-3 py-2 text-sm mt-1 bg-white">
-              <option>Week 1</option><option>Week 2</option><option>Week 3</option><option>Week 4</option>
-            </select>
-          </div>
-          <div>
-            <label class="text-xs font-semibold text-gray-600">Status</label>
-            <select id="v-status" class="w-full border rounded-lg px-3 py-2 text-sm mt-1 bg-white">
-              <option>Planned</option><option>Filmed</option><option>Edited</option><option>Posted</option>
-            </select>
-          </div>
-          <div>
-            <label class="text-xs font-semibold text-gray-600">Platform</label>
-            <select id="v-platform" class="w-full border rounded-lg px-3 py-2 text-sm mt-1 bg-white">
-              <option>YouTube</option><option>Instagram</option><option>Facebook</option><option>TikTok</option><option>Multiple</option>
-            </select>
-          </div>
-          <div>
-            <label class="text-xs font-semibold text-gray-600">Views</label>
-            <input id="v-views" type="number" class="w-full border rounded-lg px-3 py-2 text-sm mt-1" placeholder="0" />
-          </div>
-          <div>
-            <label class="text-xs font-semibold text-gray-600">Leads Generated</label>
-            <input id="v-leads" type="number" class="w-full border rounded-lg px-3 py-2 text-sm mt-1" placeholder="0" />
-          </div>
-        </div>
-        <button onclick="addVideo()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium">Save Video</button>
-      </div>
-      <div id="video-list" class="space-y-2"></div>
-    </div>
+  // Write to DAILY_CALL_LIST
+  outSheet.clearContents();
+  outSheet.appendRow(['#', 'Name / Address', 'City / Source', 'Details', 'Notes', 'Status', 'Origin', 'Phone']);
 
-    <!-- AI TOOLS -->
-    <div id="view-ai" class="hidden space-y-6">
-      <div class="bg-white rounded-xl border p-5">
-        <div class="font-bold text-gray-800 text-lg mb-1">🎯 Lead Scorer</div>
-        <div class="text-xs text-gray-400 mb-4">AI ranks seller motivation 1–10 with a reason and recommended opener.</div>
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div><label class="text-xs font-semibold text-gray-600">Address</label><input id="score-address" class="w-full border rounded-lg px-3 py-2 text-sm mt-1" placeholder="123 Maple St, Easton PA" /></div>
-          <div><label class="text-xs font-semibold text-gray-600">Original Price</label><input id="score-orig" class="w-full border rounded-lg px-3 py-2 text-sm mt-1" placeholder="$450,000" /></div>
-          <div><label class="text-xs font-semibold text-gray-600">Current List Price</label><input id="score-list" class="w-full border rounded-lg px-3 py-2 text-sm mt-1" placeholder="$429,000" /></div>
-          <div><label class="text-xs font-semibold text-gray-600">Days on Market</label><input id="score-dom" class="w-full border rounded-lg px-3 py-2 text-sm mt-1" placeholder="42" /></div>
-          <div class="sm:col-span-2"><label class="text-xs font-semibold text-gray-600">Marketing Remarks</label><textarea id="score-remarks" class="w-full border rounded-lg px-3 py-2 text-sm mt-1" rows="2" placeholder="Motivated seller, price reduced..."></textarea></div>
-        </div>
-        <button onclick="scoreLead()" class="mt-4 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-lg text-sm font-semibold">Score This Lead</button>
-        <div id="score-result" class="mt-4 hidden"></div>
-      </div>
+  // Style header row
+  const headerRange = outSheet.getRange(1, 1, 1, 8);
+  headerRange.setBackground('#1e293b');
+  headerRange.setFontColor('#ffffff');
+  headerRange.setFontWeight('bold');
 
-      <div class="bg-white rounded-xl border p-5">
-        <div class="font-bold text-gray-800 text-lg mb-1">📞 Call Coach</div>
-        <div class="text-xs text-gray-400 mb-4">Paste your call notes. Get what went well, the objection, and your exact follow-up script.</div>
-        <div class="space-y-3">
-          <div><label class="text-xs font-semibold text-gray-600">Lead Name / Address</label><input id="coach-name" class="w-full border rounded-lg px-3 py-2 text-sm mt-1" placeholder="John Smith / 123 Maple St" /></div>
-          <div><label class="text-xs font-semibold text-gray-600">Your Call Notes</label><textarea id="coach-notes" class="w-full border rounded-lg px-3 py-2 text-sm mt-1" rows="4" placeholder="Called John, he answered. Said he's not ready yet..."></textarea></div>
-        </div>
-        <button onclick="coachCall()" class="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-semibold">Get Coaching</button>
-        <div id="coach-result" class="mt-4 hidden"></div>
-      </div>
-
-      <div class="bg-white rounded-xl border p-5">
-        <div class="font-bold text-gray-800 text-lg mb-1">✉️ Follow-Up Writer</div>
-        <div class="text-xs text-gray-400 mb-4">Get a ready-to-send SMS or email in seconds.</div>
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div><label class="text-xs font-semibold text-gray-600">Lead Name</label><input id="fw-name" class="w-full border rounded-lg px-3 py-2 text-sm mt-1" placeholder="John Smith" /></div>
-          <div><label class="text-xs font-semibold text-gray-600">Property</label><input id="fw-property" class="w-full border rounded-lg px-3 py-2 text-sm mt-1" placeholder="123 Maple St" /></div>
-          <div><label class="text-xs font-semibold text-gray-600">Message Type</label>
-            <select id="fw-type" class="w-full border rounded-lg px-3 py-2 text-sm mt-1 bg-white">
-              <option>SMS (short, casual)</option><option>Email (professional)</option>
-            </select>
-          </div>
-          <div><label class="text-xs font-semibold text-gray-600">Your Name</label><input id="fw-agent" class="w-full border rounded-lg px-3 py-2 text-sm mt-1" placeholder="Your name" /></div>
-          <div class="sm:col-span-2"><label class="text-xs font-semibold text-gray-600">Context</label><textarea id="fw-context" class="w-full border rounded-lg px-3 py-2 text-sm mt-1" rows="3" placeholder="Spoke last week, wants to wait until spring..."></textarea></div>
-        </div>
-        <button onclick="writeFollowUp()" class="mt-4 bg-purple-600 hover:bg-purple-700 text-white px-5 py-2 rounded-lg text-sm font-semibold">Write Message</button>
-        <div id="fw-result" class="mt-4 hidden"></div>
-      </div>
-    </div>
-
-  </div>
-
-  <script>
-    const SHEET_API = 'https://script.google.com/macros/s/AKfycbz_PaC9QBcynvG-DPAcCGAUDPGyetJjC06NfZhgkrxohWIGcB8yIACWETbWB-WJyHf0Fg/exec';
-    const AI_API   = '/api/ai';
-
-    const STATUS_COLORS = {
-      'New':'bg-blue-100 text-blue-800','Attempted':'bg-yellow-100 text-yellow-800',
-      'Contacted':'bg-purple-100 text-purple-800','Follow Up':'bg-orange-100 text-orange-800',
-      'Appointment':'bg-green-100 text-green-800','Listing':'bg-emerald-100 text-emerald-800',
-      'Dead':'bg-gray-100 text-gray-400',
+  leads.forEach((l, i) => {
+    const skipBadge = !l.hasPhone ? ' 🔍' : l.skipStatus === 'Complete' ? ' ✅' : '';
+    outSheet.appendRow([i + 1, l.name + skipBadge, l.source, l.details, l.notes, l.status, l.origin, l.phone, l.ownerName]);
+    // Color code by status
+    const colors = {
+      'Appointment': '#d1fae5',
+      'Follow Up':   '#fef3c7',
+      'Contacted':   '#ede9fe',
+      'Attempted':   '#fef9c3',
+      'New':         '#f1f5f9',
     };
-    const STAGES = ['New','Attempted','Contacted','Follow Up','Appointment','Listing'];
-    let mlsData=[], inboundData=[], callData=[];
+    outSheet.getRange(i + 2, 1, 1, 8).setBackground(colors[l.status] || '#ffffff');
+  });
 
-    // ── PLAN DATA ──
-    const PLAN_WEEKS = [
-      { week: 1, title: "Plant Your Flag", color: "border-blue-300 bg-blue-50",
-        tasks: [
-          "Tell your positioning statement to 5 warm contacts every day",
-          "Join 5 NYC-based Facebook groups where people discuss leaving the city",
-          "Join 5 Lehigh Valley / Easton Facebook groups",
-          "Pull 20 absentee owner records in Easton / Northampton County",
-          "Identify 20 landlords advertising rentals in Easton",
-          'Film 2 videos: "What $500K buys in Easton vs NYC" and "The honest commute from Easton to Manhattan"',
-        ]
-      },
-      { week: 2, title: "Start Conversations", color: "border-emerald-300 bg-emerald-50",
-        tasks: [
-          "Contact 25 absentee owners with a soft, helpful opener — no pitch",
-          "Contact 25 landlords — not to pitch, but to understand their plans",
-          "Comment meaningfully on 10 posts in NYC exodus Facebook groups",
-          "Post your 2 videos from Week 1 and engage every comment personally",
-          "Visit 4 open houses in Easton — meet neighbors, not just agents",
-          'Film 2 more videos: "Why NYC families are choosing Easton" and "What your NYC equity can buy you here"',
-        ]
-      },
-      { week: 3, title: "Deepen Relationships", color: "border-purple-300 bg-purple-50",
-        tasks: [
-          "Follow up with every absentee owner and landlord contacted in Week 1",
-          "Offer a free rent analysis to 5 landlords",
-          'Ask your warm network: "Do you know anyone thinking about leaving NYC?"',
-          "Attend or host 1 local Easton community event",
-          "Post 2 videos and engage every comment personally",
-          "Identify 3 local Easton businesses frequented by transplants — introduce yourself",
-        ]
-      },
-      { week: 4, title: "Position for Listings", color: "border-orange-300 bg-orange-50",
-        tasks: [
-          "Re-contact absentee owners who engaged during Week 2",
-          'Ask 5 landlords: "Are you planning to hold long term or would you consider selling?"',
-          "Send a personal market update to every warm lead in your CRM",
-          'Post your strongest video: "The Relocation Plan — how I help NYC families move to Easton stress free"',
-          "Set 2 coffee meetings with warm leads or referral partners",
-          "Visit 4 open houses — continue building local presence",
-        ]
-      },
-    ];
+  // Auto-resize columns
+  outSheet.autoResizeColumns(1, 8);
 
-    // ── SCRIPTS DATA ──
-    const SCRIPTS = [
-      { category: "Positioning", title: "Your Positioning Statement", body: `"I help NYC families trade the chaos of the city for more space, more peace, and a home they can actually afford in Easton, PA."\n\nUse this every day. Say it to 5 warm contacts. Post it. Own it.` },
-      { category: "Absentee Owners", title: "Absentee Owner Opener", body: `"Hi [Name], my name is [Your Name] — I'm a real estate agent who specializes in the Easton area. I came across your property at [Address] and wanted to reach out. I work with a lot of NYC families who are relocating to this area and I'm always looking for properties that might be a good fit. I'm not calling to pressure you into anything — I'm just curious, have you given any thought to what your long-term plans are with that property?"` },
-      { category: "Landlords", title: "Landlord Soft Opener", body: `"Hi [Name], this is [Your Name], I'm a local real estate agent in Easton. I saw your rental listing on [Platform] and just wanted to reach out — not to pitch you, but just to connect. I work with a lot of investor-landlords in this area and I like to understand what people's plans are. How long have you owned the property? Are you enjoying being a landlord or is it more of a means to an end?"` },
-      { category: "NYC Leads", title: "NYC Facebook Group Comment", body: `When someone posts about leaving NYC:\n\n"This is exactly what I help people with. The commute from Easton to Manhattan is very doable — under 90 minutes by bus or train — and what your NYC budget buys you out there is a completely different life. Happy to answer any questions if you're seriously looking."` },
-      { category: "NYC Leads", title: "NYC to Easton DM Opener", body: `"Hey [Name], I saw your post about considering leaving NYC. I specialize in helping NYC families relocate to Easton, PA — it's become a really popular move lately because of the space, affordability, and the commute is manageable. I put together a quick comparison I'd love to share with you. Would that be helpful?"` },
-      { category: "Follow-Up", title: "Warm Network Ask", body: `"Hey [Name], hope you're doing well! I wanted to reach out because I'm really focused on helping NYC families make the move to Easton, PA right now. Do you happen to know anyone in your circle who's been talking about leaving the city or looking for more space? I'd love an introduction — I promise I'll take good care of them."` },
-      { category: "Expired Listings", title: "Expired Listing Opener", body: `"Hi [Name], this is [Your Name] with [Brokerage]. I noticed your home at [Address] recently came off the market. I specialize in homes in this area and I work with a steady stream of buyers relocating from NYC who are specifically looking in Easton. I have a few ideas I'd love to share — would you be open to a quick 10-minute call this week?"` },
-      { category: "Appointments", title: "Appointment Confirmation", body: `"Hi [Name], just confirming our meeting [Day] at [Time]. I'll be bringing a full market analysis and a relocation guide I've put together specifically for families making the NYC to Easton move. If anything changes, please text or call me at [Phone]. Really looking forward to connecting!"` },
-    ];
+  Logger.log(`Call list built: ${leads.length} leads`);
+}
 
-    // ── VIDEO DATA ──
-    const SUGGESTED_VIDEOS = [
-      { week: "Week 1", title: "What $500K buys you in Easton vs NYC" },
-      { week: "Week 1", title: "The honest commute from Easton to Manhattan" },
-      { week: "Week 2", title: "Why NYC families are choosing Easton" },
-      { week: "Week 2", title: "What your NYC equity can buy you here" },
-      { week: "Week 3", title: "A day in the life — Easton transplant from Brooklyn" },
-      { week: "Week 3", title: "Top 5 neighborhoods in Easton for NYC families" },
-      { week: "Week 4", title: "The Relocation Plan — how I help NYC families move to Easton stress free" },
-    ];
 
-    let videos = JSON.parse(localStorage.getItem('le_videos') || '[]');
-    let weeklyData = JSON.parse(localStorage.getItem('le_weekly') || '{}');
-    let planChecks = JSON.parse(localStorage.getItem('le_plan') || '{}');
+// ============================================================
+// SCRIPT 2: FLAG HIGH-DOM LEADS
+// Runs every morning at 7am
+// Highlights RAW_MLS rows by urgency level
+// ============================================================
+function flagHighDOM() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('RAW_MLS');
+  const data  = sheet.getDataRange().getValues();
 
-    // ── WEEKLY TARGETS ──
-    const WEEKLY_METRICS = [
-      { key: 'conversations', label: 'New Conversations', goal: 25, icon: '💬' },
-      { key: 'followups',     label: 'Follow-Ups',        goal: 50, icon: '📞' },
-      { key: 'posts',         label: 'Social Media Posts',goal: 3,  icon: '📱' },
-      { key: 'touchpoints',   label: 'Community Touchpoints', goal: 2, icon: '🤝' },
-      { key: 'openhouses',    label: 'Open Houses Attended', goal: 4, icon: '🏠' },
-    ];
+  data.slice(1).forEach((row, i) => {
+    const dom    = parseInt(row[5]) || 0;
+    const status = row[7] || '';
+    const rowNum = i + 2;
+    const range  = sheet.getRange(rowNum, 1, 1, 10);
 
-    const DAILY_ITEMS = [
-      { key: 'd_warm',    label: '3 warm network touchpoints (text, call, DM)' },
-      { key: 'd_absentee',label: '5 absentee owner outreach contacts' },
-      { key: 'd_landlord',label: '5 landlord contacts' },
-      { key: 'd_followup',label: '10 follow-ups on existing conversations' },
-      { key: 'd_visible', label: '1 visibility action (post, comment, or share)' },
-      { key: 'd_crm',     label: 'Update CRM after every interaction' },
-    ];
-
-    function badge(s) {
-      const c = STATUS_COLORS[s]||'bg-gray-100 text-gray-600';
-      return `<span class="text-xs font-semibold px-2 py-0.5 rounded-full ${c}">${s||'New'}</span>`;
+    if (status === 'Dead' || status === 'Listing') {
+      range.setBackground('#f1f5f9'); // grey out inactive
+    } else if (dom > 60) {
+      range.setBackground('#fee2e2'); // red — very motivated
+    } else if (dom > 30) {
+      range.setBackground('#ffedd5'); // orange — motivated
+    } else if (dom > 14) {
+      range.setBackground('#fef9c3'); // yellow — watch
+    } else {
+      range.setBackground('#ffffff'); // fresh listing
     }
+  });
 
-    function resultBox(content, color='emerald') {
-      return `<div class="bg-${color}-50 border border-${color}-200 rounded-xl p-4 text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">${content}</div>`;
-    }
+  Logger.log('DOM flagging complete');
+}
 
-    function loadingBox(msg) {
-      return `<div class="bg-gray-50 border rounded-xl p-4 text-sm text-gray-400"><span class="spin">⏳</span> ${msg}</div>`;
-    }
 
-    async function callAI(prompt) {
-      const res = await fetch(AI_API, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt })
+// ============================================================
+// SCRIPT 3: SEND FOLLOW-UP DIGEST EMAIL
+// Runs every morning at 8am
+// Emails you a list of all Follow Up leads for the day
+// ============================================================
+function sendFollowUpDigest() {
+  const settings = getSettings();
+  const ss       = SpreadsheetApp.getActiveSpreadsheet();
+
+  const mlsData     = ss.getSheetByName('RAW_MLS').getDataRange().getValues();
+  const inboundData = ss.getSheetByName('INBOUND_LEADS').getDataRange().getValues();
+
+  let followUps = [];
+
+  mlsData.slice(1).forEach(r => {
+    if (r[7] === 'Follow Up') {
+      followUps.push({
+        name:   `${r[0]} ${r[1]} (${r[2]})`,
+        notes:  r[8] || 'No notes',
+        origin: 'MLS',
+        phone:  '',
       });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      return data.result;
     }
+  });
 
-    // ── RENDER PLAN ──
-    function renderPlan() {
-      const el = document.getElementById('plan-weeks');
-      el.innerHTML = PLAN_WEEKS.map(w => {
-        const tasks = w.tasks.map((t, i) => {
-          const key = `w${w.week}_t${i}`;
-          const checked = planChecks[key] || false;
-          return `<label class="flex gap-3 items-start cursor-pointer group">
-            <input type="checkbox" ${checked ? 'checked' : ''} onchange="togglePlan('${key}', this.checked)"
-              class="mt-0.5 w-4 h-4 accent-emerald-500 shrink-0" />
-            <span class="text-sm ${checked ? 'line-through text-gray-300' : 'text-gray-700'}">${t}</span>
-          </label>`;
-        }).join('');
-        const done  = w.tasks.filter((_, i) => planChecks[`w${w.week}_t${i}`]).length;
-        const pct   = Math.round((done / w.tasks.length) * 100);
-        return `
-          <div class="bg-white rounded-xl border-2 ${w.color} p-4">
-            <div class="flex items-center justify-between mb-3">
-              <div>
-                <div class="text-xs font-bold text-gray-400 uppercase">Week ${w.week}</div>
-                <div class="font-bold text-gray-800">${w.title}</div>
-              </div>
-              <div class="text-right">
-                <div class="text-lg font-bold text-emerald-600">${pct}%</div>
-                <div class="text-xs text-gray-400">${done}/${w.tasks.length} done</div>
-              </div>
-            </div>
-            <div class="w-full bg-gray-100 rounded-full h-1.5 mb-3">
-              <div class="bg-emerald-500 h-1.5 rounded-full" style="width:${pct}%"></div>
-            </div>
-            <div class="space-y-2">${tasks}</div>
-          </div>`;
-      }).join('');
-    }
-
-    function togglePlan(key, val) {
-      planChecks[key] = val;
-      localStorage.setItem('le_plan', JSON.stringify(planChecks));
-      renderPlan();
-    }
-
-    // ── RENDER WEEKLY ──
-    function renderWeekly() {
-      const el = document.getElementById('weekly-targets');
-      el.innerHTML = WEEKLY_METRICS.map(m => {
-        const cur = weeklyData[m.key] || 0;
-        const pct = Math.min(100, Math.round((cur / m.goal) * 100));
-        const color = pct >= 100 ? 'bg-emerald-500' : pct >= 50 ? 'bg-blue-500' : 'bg-orange-400';
-        return `
-          <div class="bg-white rounded-xl border p-4">
-            <div class="flex items-center justify-between mb-2">
-              <div class="flex items-center gap-2">
-                <span class="text-lg">${m.icon}</span>
-                <div class="font-semibold text-sm text-gray-700">${m.label}</div>
-              </div>
-              <div class="text-xs text-gray-400">Goal: ${m.goal}</div>
-            </div>
-            <div class="flex items-center gap-3">
-              <div class="flex-1">
-                <div class="w-full bg-gray-100 rounded-full h-2">
-                  <div class="${color} h-2 rounded-full transition-all" style="width:${pct}%"></div>
-                </div>
-              </div>
-              <div class="flex items-center gap-1">
-                <button onclick="adjustMetric('${m.key}', -1)" class="w-6 h-6 rounded-full bg-gray-100 hover:bg-gray-200 text-sm font-bold flex items-center justify-center">−</button>
-                <span class="text-lg font-bold w-8 text-center">${cur}</span>
-                <button onclick="adjustMetric('${m.key}', 1)" class="w-6 h-6 rounded-full bg-emerald-100 hover:bg-emerald-200 text-sm font-bold flex items-center justify-center text-emerald-700">+</button>
-              </div>
-            </div>
-            ${pct >= 100 ? '<div class="text-xs text-emerald-600 font-semibold mt-1">✅ Goal reached!</div>' : ''}
-          </div>`;
-      }).join('');
-
-      const dl = document.getElementById('daily-checklist');
-      const today = new Date().toDateString();
-      const dailyKey = 'daily_' + today;
-      const dailyChecks = JSON.parse(localStorage.getItem(dailyKey) || '{}');
-      dl.innerHTML = DAILY_ITEMS.map(d => {
-        const checked = dailyChecks[d.key] || false;
-        return `<label class="flex gap-3 items-center cursor-pointer">
-          <input type="checkbox" ${checked ? 'checked' : ''} onchange="toggleDaily('${d.key}', this.checked, '${dailyKey}')"
-            class="w-4 h-4 accent-emerald-500" />
-          <span class="text-sm ${checked ? 'line-through text-gray-300' : 'text-gray-700'}">${d.label}</span>
-        </label>`;
-      }).join('');
-    }
-
-    function adjustMetric(key, delta) {
-      weeklyData[key] = Math.max(0, (weeklyData[key] || 0) + delta);
-      localStorage.setItem('le_weekly', JSON.stringify(weeklyData));
-      renderWeekly();
-    }
-
-    function resetWeekly() {
-      if (confirm('Reset all weekly numbers to zero?')) {
-        weeklyData = {};
-        localStorage.setItem('le_weekly', JSON.stringify(weeklyData));
-        renderWeekly();
-      }
-    }
-
-    function toggleDaily(key, val, storageKey) {
-      const d = JSON.parse(localStorage.getItem(storageKey) || '{}');
-      d[key] = val;
-      localStorage.setItem(storageKey, JSON.stringify(d));
-    }
-
-    // ── RENDER SCRIPTS ──
-    function renderScripts() {
-      const categories = [...new Set(SCRIPTS.map(s => s.category))];
-      document.getElementById('scripts-list').innerHTML = categories.map(cat => {
-        const catScripts = SCRIPTS.filter(s => s.category === cat);
-        return `
-          <div>
-            <div class="text-xs font-bold text-gray-400 uppercase mb-2">${cat}</div>
-            <div class="space-y-2">
-              ${catScripts.map(s => `
-                <div class="bg-white rounded-xl border p-4">
-                  <div class="font-semibold text-gray-800 mb-2 text-sm">${s.title}</div>
-                  <div class="text-sm text-gray-600 bg-slate-50 rounded-lg p-3 leading-relaxed whitespace-pre-wrap italic">${s.body}</div>
-                  <button onclick="copyScript(this)" data-text="${encodeURIComponent(s.body)}"
-                    class="mt-2 text-xs bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-lg">Copy</button>
-                </div>`).join('')}
-            </div>
-          </div>`;
-      }).join('');
-    }
-
-    function copyScript(btn) {
-      navigator.clipboard.writeText(decodeURIComponent(btn.dataset.text));
-      btn.textContent = '✓ Copied';
-      setTimeout(() => btn.textContent = 'Copy', 2000);
-    }
-
-    // ── RENDER VIDEOS ──
-    function renderVideos() {
-      const el = document.getElementById('video-list');
-      const statusColors = {
-        'Planned':'bg-gray-100 text-gray-600',
-        'Filmed':'bg-blue-100 text-blue-700',
-        'Edited':'bg-purple-100 text-purple-700',
-        'Posted':'bg-emerald-100 text-emerald-700',
-      };
-
-      let html = '';
-
-      // Suggested videos
-      const postedTitles = videos.map(v => v.title);
-      const suggested = SUGGESTED_VIDEOS.filter(v => !postedTitles.includes(v.title));
-      if (suggested.length) {
-        html += `<div class="text-xs font-bold text-gray-400 uppercase mb-2">📋 Suggested from Your 30-Day Plan</div>`;
-        html += suggested.map(v => `
-          <div class="bg-white rounded-xl border border-dashed border-gray-200 px-4 py-3 flex items-center justify-between">
-            <div>
-              <div class="text-sm text-gray-500">${v.title}</div>
-              <div class="text-xs text-gray-300">${v.week}</div>
-            </div>
-            <button onclick="quickAddVideo('${encodeURIComponent(v.title)}','${v.week}')"
-              class="text-xs bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded-lg text-gray-600">+ Add</button>
-          </div>`).join('');
-      }
-
-      if (videos.length) {
-        html += `<div class="text-xs font-bold text-gray-400 uppercase mb-2 mt-4">🎥 Your Videos</div>`;
-        html += videos.map((v, i) => `
-          <div class="bg-white rounded-xl border p-4">
-            <div class="flex items-start justify-between gap-2">
-              <div class="flex-1">
-                <div class="font-semibold text-sm text-gray-800">${v.title}</div>
-                <div class="text-xs text-gray-400 mt-0.5">${v.week} · ${v.platform}</div>
-                <div class="flex gap-3 mt-2 text-xs text-gray-500">
-                  ${v.views ? `👁 ${v.views} views` : ''}
-                  ${v.leads ? `🎯 ${v.leads} leads` : ''}
-                </div>
-              </div>
-              <div class="flex flex-col items-end gap-2">
-                <span class="text-xs font-semibold px-2 py-0.5 rounded-full ${statusColors[v.status]||''}">${v.status}</span>
-                <button onclick="removeVideo(${i})" class="text-xs text-red-400 hover:text-red-600">Remove</button>
-              </div>
-            </div>
-          </div>`).join('');
-      }
-
-      el.innerHTML = html || '<div class="bg-white rounded-xl border p-6 text-center text-gray-400 text-sm">No videos yet — add your first one above.</div>';
-    }
-
-    function showAddVideo() {
-      const f = document.getElementById('add-video-form');
-      f.classList.toggle('hidden');
-    }
-
-    function addVideo() {
-      const title = document.getElementById('v-title').value;
-      if (!title) return;
-      videos.push({
-        title,
-        week:     document.getElementById('v-week').value,
-        status:   document.getElementById('v-status').value,
-        platform: document.getElementById('v-platform').value,
-        views:    document.getElementById('v-views').value || 0,
-        leads:    document.getElementById('v-leads').value || 0,
+  inboundData.slice(1).forEach(r => {
+    if (r[5] === 'Follow Up') {
+      followUps.push({
+        name:   `${r[1]}`,
+        notes:  r[6] || 'No notes',
+        origin: 'Inbound',
+        phone:  r[2] || '',
       });
-      localStorage.setItem('le_videos', JSON.stringify(videos));
-      document.getElementById('add-video-form').classList.add('hidden');
-      document.getElementById('v-title').value = '';
-      renderVideos();
     }
+  });
 
-    function quickAddVideo(encodedTitle, week) {
-      videos.push({ title: decodeURIComponent(encodedTitle), week, status: 'Planned', platform: 'Multiple', views: 0, leads: 0 });
-      localStorage.setItem('le_videos', JSON.stringify(videos));
-      renderVideos();
+  if (followUps.length === 0) {
+    Logger.log('No follow-ups today, skipping email');
+    return;
+  }
+
+  const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+
+  let body = `Good morning ${settings.name},\n\n`;
+  body += `You have ${followUps.length} follow-up${followUps.length > 1 ? 's' : ''} scheduled for ${today}:\n\n`;
+
+  followUps.forEach((f, i) => {
+    body += `${i + 1}. ${f.name} [${f.origin}]\n`;
+    if (f.phone) body += `   📞 ${f.phone}\n`;
+    body += `   📝 ${f.notes}\n\n`;
+  });
+
+  body += `---\nOpen your Lead Engine to start your calls.\nGood luck today!\n`;
+
+  GmailApp.sendEmail(
+    settings.email,
+    `☎️ ${followUps.length} Follow-Up${followUps.length > 1 ? 's' : ''} Due Today — ${today}`,
+    body
+  );
+
+  Logger.log(`Digest sent: ${followUps.length} follow-ups`);
+}
+
+
+// ============================================================
+// SCRIPT 4: FLAG DUPLICATE LEADS
+// Trigger: On change (runs when you paste new MLS data)
+// Highlights duplicate addresses in purple
+// ============================================================
+function flagDuplicates() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('RAW_MLS');
+  const data  = sheet.getDataRange().getValues();
+
+  const seen = {};
+  let dupeCount = 0;
+
+  data.slice(1).forEach((row, i) => {
+    const addr = `${row[0]} ${row[1]}`.trim().toLowerCase();
+    if (!addr || addr === ' ') return;
+
+    const rowNum = i + 2;
+    if (seen[addr] !== undefined) {
+      // Duplicate — highlight purple
+      sheet.getRange(rowNum, 1, 1, 10).setBackground('#ede9fe');
+      // Add note to first occurrence too
+      sheet.getRange(seen[addr], 1, 1, 10).setBackground('#ede9fe');
+      dupeCount++;
+    } else {
+      seen[addr] = rowNum;
     }
+  });
 
-    function removeVideo(i) {
-      videos.splice(i, 1);
-      localStorage.setItem('le_videos', JSON.stringify(videos));
-      renderVideos();
-    }
+  if (dupeCount > 0) {
+    SpreadsheetApp.getUi().alert(`⚠️ ${dupeCount} duplicate address(es) found and highlighted in purple.`);
+  }
 
-    // ── AI TOOLS ──
-    async function scoreLead() {
-      const el = document.getElementById('score-result');
-      el.classList.remove('hidden');
-      el.innerHTML = loadingBox('Scoring this lead...');
-      try {
-        const prompt = `You are an expert real estate coach helping an agent who specializes in NYC to Easton PA relocations.
+  Logger.log(`Duplicate check: ${dupeCount} dupes found`);
+}
 
-Analyze this MLS lead and score seller motivation:
-Address: ${document.getElementById('score-address').value}
-Original Price: ${document.getElementById('score-orig').value}
-Current List Price: ${document.getElementById('score-list').value}
-Days on Market: ${document.getElementById('score-dom').value}
-Marketing Remarks: ${document.getElementById('score-remarks').value}
 
-Respond in this exact format:
-SCORE: [1-10]
-MOTIVATION: [1-2 sentence explanation]
-RED FLAGS: [any concerns, or "None"]
-OPENER: [One specific opening line tailored for an NYC to Easton relocation specialist]`;
-        el.innerHTML = resultBox(await callAI(prompt), 'emerald');
-      } catch(e) { el.innerHTML = resultBox(`Error: ${e.message}`, 'red'); }
-    }
+// ============================================================
+// WEB APP API — Serves sheet data as JSON to your front-end
+// Deploy as Web App (Anyone) to connect the Lead Engine UI
+// ============================================================
+function doGet(e) {
+  const ss        = SpreadsheetApp.getActiveSpreadsheet();
+  const tabName   = (e && e.parameter && e.parameter.tab) ? e.parameter.tab : 'DAILY_CALL_LIST';
+  const sheet     = ss.getSheetByName(tabName);
 
-    async function coachCall() {
-      const el = document.getElementById('coach-result');
-      el.classList.remove('hidden');
-      el.innerHTML = loadingBox('Analyzing your call...');
-      try {
-        const prompt = `You are an expert real estate sales coach reviewing a call made by an NYC to Easton relocation specialist.
+  if (!sheet) {
+    return ContentService
+      .createTextOutput(JSON.stringify({ error: `Tab '${tabName}' not found` }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
 
-Lead: ${document.getElementById('coach-name').value}
-Call Notes: ${document.getElementById('coach-notes').value}
+  const data    = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const rows    = data.slice(1)
+    .filter(row => row.some(cell => cell !== ''))
+    .map(row => {
+      const obj = {};
+      headers.forEach((h, i) => obj[h] = row[i]);
+      return obj;
+    });
 
-Respond in this exact format:
-WHAT WENT WELL: [1-2 things]
-OBJECTION IDENTIFIED: [The core objection]
-ROOT CAUSE: [What's really behind it]
-FOLLOW-UP SCRIPT: [Word-for-word what to say next time]
-TIMING: [When to follow up and why]`;
-        el.innerHTML = resultBox(await callAI(prompt), 'blue');
-      } catch(e) { el.innerHTML = resultBox(`Error: ${e.message}`, 'red'); }
-    }
+  return ContentService
+    .createTextOutput(JSON.stringify(rows))
+    .setMimeType(ContentService.MimeType.JSON);
+}
 
-    async function writeFollowUp() {
-      const el = document.getElementById('fw-result');
-      el.classList.remove('hidden');
-      el.innerHTML = loadingBox('Writing your message...');
-      try {
-        const type = document.getElementById('fw-type').value;
-        const isSMS = type.includes('SMS');
-        const prompt = `You are an expert real estate copywriter for an NYC to Easton PA relocation specialist.
 
-Lead: ${document.getElementById('fw-name').value}
-Property: ${document.getElementById('fw-property').value}
-Agent: ${document.getElementById('fw-agent').value}
-Type: ${type}
-Context: ${document.getElementById('fw-context').value}
-
-Write a ${isSMS ? 'short natural SMS under 160 characters, never salesy' : 'warm professional email with subject line'}.
-Make it personal and specific. No real estate clichés.`;
-        const result = await callAI(prompt);
-        el.innerHTML = resultBox(result, 'purple') +
-          `<button onclick="navigator.clipboard.writeText(document.getElementById('fw-result').querySelector('div').innerText)" class="mt-2 text-xs bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg">Copy Message</button>`;
-      } catch(e) { el.innerHTML = resultBox(`Error: ${e.message}`, 'red'); }
-    }
-
-    // ── SHEET DATA ──
-    async function fetchTab(tab) {
-      try {
-        const res = await fetch(`${SHEET_API}?tab=${tab}`);
-        return await res.json();
-      } catch(e) { return []; }
-    }
-
-    async function refreshAll() {
-      [mlsData, inboundData, callData] = await Promise.all([
-        fetchTab('RAW_MLS'), fetchTab('INBOUND_LEADS'), fetchTab('DAILY_CALL_LIST'),
-      ]);
-      renderDashboard(); renderCallList(); renderMLS(); renderInbound(); renderPipeline();
-    }
-
-    function renderDashboard() {
-      const all = [...mlsData, ...inboundData];
-      document.getElementById('stat-total').textContent    = all.length;
-      document.getElementById('stat-calls').textContent    = callData.length;
-      document.getElementById('stat-appts').textContent    = all.filter(l=>l['Status']==='Appointment').length;
-      document.getElementById('stat-listings').textContent = all.filter(l=>l['Status']==='Listing').length;
-      const el = document.getElementById('priority-list');
-      const top = callData.slice(0,5);
-      if (!top.length) { el.innerHTML='<div class="p-6 text-center text-gray-400 text-sm">No active leads yet.</div>'; return; }
-      el.innerHTML = top.map(l=>`
-        <div class="flex items-center justify-between px-4 py-3 gap-2">
-          <div>
-            <div class="font-medium text-sm">${l['Name / Address']||l['Name/Address']||'—'}</div>
-            <div class="text-xs text-gray-400">${l['Origin']||''} · ${l['City / Source']||l['City/Source']||''}</div>
-          </div>
-          ${badge(l['Status'])}
-        </div>`).join('');
-    }
-
-    function renderCallList() {
-      const el = document.getElementById('calllist-body');
-      if (!callData.length) { el.innerHTML='<div class="bg-white rounded-xl border p-6 text-center text-gray-400 text-sm">No calls today.</div>'; return; }
-      el.innerHTML = callData.map((l,i)=>{
-        const phone   = l['Phone']||'';
-        const owner   = l['Owner Name']||l['OwnerName']||'';
-        const noPhone = !phone;
-        const rowBg   = noPhone ? 'bg-yellow-50 border-yellow-200' : 'bg-white';
-        return `
-        <div class="${rowBg} rounded-xl border px-4 py-3 flex items-center gap-4">
-          <div class="text-lg font-bold text-gray-300 w-6">${i+1}</div>
-          <div class="flex-1 min-w-0">
-            <div class="font-semibold text-gray-800">${l['Name / Address']||l['Name/Address']||'—'}</div>
-            ${owner?`<div class="text-xs text-blue-600 font-medium">${owner}</div>`:''}
-            <div class="text-xs text-gray-400">${l['Origin']||''} · ${l['City / Source']||l['City/Source']||''} ${phone?'· <span class="text-gray-700 font-medium">'+phone+'</span>':''}</div>
-            ${l['Notes']?`<div class="text-xs text-gray-500 mt-0.5 italic">${l['Notes']}</div>`:''}
-            ${noPhone?'<div class="text-xs text-yellow-600 font-semibold mt-0.5">🔍 Needs skip tracing</div>':''}
-          </div>
-          <div class="flex flex-col items-end gap-1">
-            ${badge(l['Status'])}
-            ${l['Details']?`<div class="text-xs text-gray-400">${l['Details']}</div>`:''}
-          </div>
-        </div>`;
-      }).join('');
-    }
-
-    function renderMLS() {
-      const el = document.getElementById('mls-body');
-      if (!mlsData.length) { el.innerHTML='<tr><td colspan="6" class="px-4 py-6 text-center text-gray-400 text-sm">No MLS data yet.</td></tr>'; return; }
-      el.innerHTML = mlsData.map(l=>{
-        const dom=parseInt(l['DOM'])||0;
-        const dc=dom>60?'text-red-600 font-bold':dom>30?'text-orange-500 font-bold':'text-gray-700';
-        return `<tr class="hover:bg-gray-50">
-          <td class="px-3 py-2 font-medium">${l['Street Number']||''} ${l['Street Name']||''}</td>
-          <td class="px-3 py-2 text-gray-500">${l['Municipality']||''}</td>
-          <td class="px-3 py-2 text-emerald-700 font-semibold">${l['Listing Price']||''}</td>
-          <td class="px-3 py-2 ${dc}">${dom}</td>
-          <td class="px-3 py-2">${badge(l['Status'])}</td>
-          <td class="px-3 py-2 text-gray-400 text-xs max-w-xs truncate">${l['Notes']||''}</td>
-        </tr>`;
-      }).join('');
-    }
-
-    function renderInbound() {
-      const el = document.getElementById('inbound-body');
-      if (!inboundData.length) { el.innerHTML='<tr><td colspan="6" class="px-4 py-6 text-center text-gray-400 text-sm">No inbound leads yet.</td></tr>'; return; }
-      el.innerHTML = inboundData.map(l=>`
-        <tr class="hover:bg-gray-50">
-          <td class="px-3 py-2 font-medium">${l['Name']||''}</td>
-          <td class="px-3 py-2 text-blue-600">${l['Phone']||''}</td>
-          <td class="px-3 py-2 text-gray-500">${l['Source']||''}</td>
-          <td class="px-3 py-2 text-gray-600 max-w-xs truncate">${l['Property']||''}</td>
-          <td class="px-3 py-2">${badge(l['Status'])}</td>
-          <td class="px-3 py-2 text-gray-400 text-xs">${l['Notes']||''}</td>
-        </tr>`).join('');
-    }
-
-    function renderPipeline() {
-      const all = [...mlsData,...inboundData];
-      document.getElementById('pipeline-board').innerHTML = STAGES.map(stage=>{
-        const leads=all.filter(l=>(l['Status']||'New')===stage);
-        return `
-          <div class="bg-white rounded-xl border p-3">
-            <div class="flex items-center justify-between mb-2">${badge(stage)}<span class="text-xs font-bold text-gray-500">${leads.length}</span></div>
-            <div class="space-y-1">
-              ${leads.length?leads.map(l=>`
-                <div class="text-xs bg-gray-50 rounded px-2 py-1.5 border">
-                  <div class="font-medium">${l['Name']||((l['Street Number']||'')+' '+(l['Street Name']||''))||'—'}</div>
-                  <div class="text-gray-400">${l['Municipality']||l['Source']||''}</div>
-                </div>`).join(''):'<div class="text-xs text-gray-300 text-center py-2">Empty</div>'}
-            </div>
-          </div>`;
-      }).join('');
-    }
-
-    function showTab(name) {
-      ['dashboard','plan','weekly','calllist','mls','inbound','pipeline','scripts','videos','ai'].forEach(t=>{
-        document.getElementById(`view-${t}`).classList.add('hidden');
-        const btn=document.getElementById(`tab-${t}`);
-        btn.classList.remove('border-emerald-500','text-emerald-700');
-        btn.classList.add('border-transparent','text-gray-500');
-      });
-      document.getElementById(`view-${name}`).classList.remove('hidden');
-      const a=document.getElementById(`tab-${name}`);
-      a.classList.add('border-emerald-500','text-emerald-700');
-      a.classList.remove('border-transparent','text-gray-500');
-      if (name==='plan') renderPlan();
-      if (name==='weekly') renderWeekly();
-      if (name==='scripts') renderScripts();
-      if (name==='videos') renderVideos();
-    }
-
-    refreshAll();
-  </script>
-</body>
-</html>
+// ============================================================
+// TRIGGER SETUP INSTRUCTIONS
+// Extensions → Apps Script → Triggers (clock icon) → Add Trigger
+//
+// Function              | Event Source  | Type          | Time
+// ---------------------------------------------------------------
+// buildCallList         | Time-driven   | Day timer     | 7–8am
+// flagHighDOM           | Time-driven   | Day timer     | 7–8am
+// sendFollowUpDigest    | Time-driven   | Day timer     | 8–9am
+// flagDuplicates        | From Sheet    | On change     | —
+// ============================================================
